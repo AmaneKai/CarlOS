@@ -1,69 +1,25 @@
 #![no_std]
 #![no_main]
-#![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
-use lazy_static::lazy_static;
-use spin::Mutex;
 
-mod vga_buffer;
-mod serial;
-mod interrupts;
-mod pic;
-mod shell;
-mod basic;
-
-pub mod keyboard_buffer;
-
-lazy_static! {
-    pub static ref SHELL: Mutex<shell::Shell> = Mutex::new(shell::Shell::new());
-    pub static ref BASIC: Mutex<basic::BasicInterpreter> = Mutex::new(basic::BasicInterpreter::new());
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
 }
 
-fn print_logo() {
-    println!(r"      /\_/\  ");
-    println!(r"     ( o.o ) ");
-    println!(r"      > ^ <  ");
-    println!(r"     /|   |\");
-    println!(r"    (_|   |_)");
-    println!();
-}
+static HELLO: &[u8] = b"Hello World!";
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    vga_buffer::clear_screen();
-    
-    print_logo();
-    
-    println!("   _____           _  ____   _____ ");
-    println!("  / ____|         | |/ __ \\ / ____|");
-    println!(" | |     __ _ _ __| | |  | | (___  ");
-    println!(" | |    / _` | '__| | |  | |\\___ \\ ");
-    println!(" | |___| (_| | |  | | |__| |____) |");
-    println!("  \\_____\\__,_|_|  |_|\\____/|_____/ ");
-    println!();
-    println!("  OS:        CarlOS x86_64");
-    println!("  Kernel:    Rust Kernel v0.1.0");
-    println!("  Shell:     carlsh");
-    println!("  BASIC:     Apple BASIC clone");
-    println!();
-    println!("Type 'help' for commands or 'basic' for BASIC mode");
-    println!();
+    let vga_buffer = 0xb8000 as *mut u8;
 
-    interrupts::init_idt();
-    
-    unsafe { pic::PICS.lock().initialize() };
-    x86_64::instructions::interrupts::enable();
-
-    SHELL.lock().print_prompt();
-
-    loop {
-        x86_64::instructions::hlt();
+    for (i, &byte) in HELLO.iter().enumerate() {
+        unsafe {
+            *vga_buffer.offset(i as isize * 2) = byte;
+            *vga_buffer.offset(i as isize * 2 + 1) = 0xb; // cyan
+        }
     }
-}
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
     loop {}
 }
